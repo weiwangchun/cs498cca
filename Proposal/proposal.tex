@@ -4,7 +4,7 @@
 \documentclass[10pt]{article}
 \usepackage[utf8]{inputenc} 
 \usepackage[T1]{fontenc}
-\usepackage{geometry} 
+\usepackage[margin=0.8in]{geometry} 
 \geometry{a4paper} 
 \usepackage{graphicx} 
 
@@ -52,19 +52,19 @@ This dataset contains trading data (price and volume) in 1 minute intervals for 
 
 \section{Research Project}
 We intend to build a cloud hosted backtesting framework for algorithmic trading. 
-Given that the dataset only contains price-volume data, we focus on testing only momentum based trading strategies. A simple web interface will allow users to contol and tweak momentum parameter settings, and see in-sample and out-of-sample trading performance (i.e., hypothetical profit and loss, trading costs, turnover, portfolio risk and Sharpe ratio). 
+Given that the dataset only contains price-volume data, we focus on testing only momentum based trading strategies. A simple web interface will allow users to control and tweak momentum parameter settings, and see in-sample and out-of-sample trading performance (i.e., hypothetical profit and loss, trading costs, turnover, portfolio risk and Sharpe ratio). 
 The objective is to develop optimal momentum strategies for trading German equities quickly via cloud computing.
 
 \subsection{Intellectual Merit}
 Seminal research by Jedadeesh and Titman (1993) show that forming portfolios based on past stock returns (6-12 months) yields positive returns over the next 3-12 months.
 This behavior of price continuation has attributed to investor behavioral biases and investor under-reaction, and have been shown to be prevalent across countries (Griffin et al. 2003), industries (Moskowitz and Grinblatt, 1999) and asset classes (Miffre and Rallis, 2007).
- 
+Our project is a cloud computing solution to that examines and optimizes momentum trading for German equities.  
 
 
 \subsection{Broader Impact}
 The project allows users to backtest and examine the efficacy of different momentum strategies in Germany.
-This is a useful tool for practitioners in the asset management industry as momentum is a key investment style\footnote{Momentum ETFs are very popular on with investors: https://etfdb.com/etfs/investment-style/high-momentum/ }.
-Furthermore, the project framework can be expanded for live trading (if there are live data feeds). 
+This is a useful tool for practitioners in the asset management industry as momentum is a key investment style\footnote{Momentum ETFs are very popular with investors: https://etfdb.com/etfs/investment-style/high-momentum/ }.
+Furthermore, the project framework can be expanded for live trading (if there are live data feeds), and also testing for other markets.
 
 
 \begin{thebibliography}{}
