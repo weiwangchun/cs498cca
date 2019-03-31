@@ -2,7 +2,7 @@ import boto3
 
 class S3Utility:
     
-    def __init__(self, aws_username, aws_access_key, region):
+    def __init__(self, aws_username=None, aws_access_key = None, region = None):
         self.s3_client = boto3.client('s3', aws_username, aws_access_key, region)
         
     def put(self, local_path, s3_bucket, s3_object_key, ExtraArgs=None):
