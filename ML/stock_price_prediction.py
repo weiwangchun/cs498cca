@@ -12,14 +12,16 @@ from datetime import date, timedelta
 import requests
 import csv
 
-
 import torch
 from torch import nn
 from torch import optim
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
-
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV
 
 
 # Load all the trades into one dataframe
@@ -172,12 +174,10 @@ for date in training_dates:
 
         # actual returns today
         ret = ret_matrix[ret_matrix.index.isin(unique_date[unique_date == date])][ISIN][0]
-        if ret > 0.01:
+        if ret > 0:
             Y[row_counter] = 1  # positive
-        elif ret < -0.01:
-            Y[row_counter] = 2  # negative
         else:
-            Y[row_counter] = 0  # neutral
+            Y[row_counter] = 0  # negative
 
         print(ISIN +" "+ str(date)+ " training features populated")
         row_counter += 1
@@ -220,17 +220,18 @@ for date in test_dates:
 
         # actual returns today
         ret = ret_matrix[ret_matrix.index.isin(unique_date[unique_date == date])][ISIN][0]
-        if ret > 0.01:
+        if ret > 0:
             Y_test[row_counter] = 1  # positive
-        elif ret < -0.01:
-            Y_test[row_counter] = 2  # negative
         else:
-            Y_test[row_counter] = 0  # neutral
+            Y_test[row_counter] = 0  # negative
 
         print(ISIN +" "+ str(date)+ " test features populated")
         row_counter += 1
 
 
+# ----------------------------------------------------------
+#  BASIC REGRESSION MODEL
+# ----------------------------------------------------------
 
 
 
@@ -269,9 +270,11 @@ def predicted_y_fn(outputs):
 # code looks ugly - need to fix
 def train(model,train_loader,test_loader,loss_func,opt,num_epochs=10):
     counter = 0
-    for epoch in range(num_epochs):
 
+
+    for epoch in range(num_epochs):
         running_loss = 0.0
+        total_accuracy = 0 
         for i, data in enumerate(train_loader):
             inputs, labels = data
             opt.zero_grad()
@@ -287,33 +290,24 @@ def train(model,train_loader,test_loader,loss_func,opt,num_epochs=10):
             counter += 1
 
             running_loss += loss.item()
-        print("Epoch {}  running loss {} - train accuracy : {}".format(epoch, running_loss, train_accuracy))
+            total_accuracy += train_accuracy
+        print("Epoch {}  running loss {} - train accuracy : {}".format(epoch, running_loss, total_accuracy / i ))
 
-        # after each epoch, evaluation mode
-        total_loss = 0.0
-        total_correct = 0.0
-        for i, data in enumerate(test_loader):
-            inputs, labels = data
-            outputs = model(inputs.to(dtype = torch.float))
-            loss = loss_func(outputs, labels.to(dtype = torch.float))
-            # test accuracy
-            predicted_y = predicted_y_fn(outputs)
-            num_correct = sum(predicted_y.to(dtype = torch.float) == labels.to(dtype = torch.float)).item() 
-
-            total_loss += loss.item()
-            total_correct += num_correct
-        
-        total_accuracy = total_correct / 10000
-        print("Epoch {}  total loss {} - total validation accuracy: {}".
-              format(epoch, total_loss,  total_accuracy))
-        
 
 # Train Basic Neural Network
 # ------------------------------------------------------------------
+
+class Flatten(nn.Module):
+  """NN Module that flattens the incoming tensor."""
+  def forward(self, input):
+    return input.view(input.size(0), -1)
+
+
 class TwoLayerModel(nn.Module):
   def __init__(self):
     super(TwoLayerModel, self).__init__()
     self.net = nn.Sequential(
+      Flatten(),  
       nn.Linear(20, 10), 
       nn.ReLU(), 
       nn.Linear(10, 3))
@@ -324,6 +318,6 @@ class TwoLayerModel(nn.Module):
 
 model = TwoLayerModel()
 loss = nn.MSELoss()
-optimizer = optim.SGD(model.parameters(), lr= 0.001)
+optimizer = optim.SGD(model.parameters(), lr= 0.05)
 
-train(model, train_loader, test_loader, loss, optimizer, 15)
+train(model, train_loader, test_loader, loss, optimizer, 200)
