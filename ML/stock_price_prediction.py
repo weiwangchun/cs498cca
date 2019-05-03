@@ -16,6 +16,7 @@ import csv
 import torch
 from torch import nn
 from torch import optim
+from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
 
@@ -134,7 +135,7 @@ def get_percentiles(tmp_data, ISIN, lookback = 10):
 
     return yesterday_value, total_value, hist_pct, peer_pct
 
-
+# Train set
 # placeholder for X and y variables 
 X = np.zeros((len(training_dates) * len(unique_ISINs)  , 4 * 5)) 
 Y = np.zeros((len(training_dates) * len(unique_ISINs)  , 1))
@@ -182,7 +183,144 @@ for date in training_dates:
         row_counter += 1
 
 
-# Train Neural Network
+# Test set   
+# placeholder for X and y variables 
+X_test = np.zeros((len(test_dates) * len(unique_ISINs)  , 4 * 5)) 
+Y_test = np.zeros((len(test_dates) * len(unique_ISINs)  , 1))
+
+row_counter = 0
+for date in test_dates:
+    for ISIN in unique_ISINs:
+
+        """
+        Return Features 
+        1) Yesterday's returns
+        2) Overall returns in lookback length
+        3) Yesterday's return as a percentile compared to the stock's historical return performance
+        4) Yesterday's return as a percentile compared to peer return performance
+        """
+        tmp = ret_matrix[ ret_matrix.index.isin(unique_date[unique_date < date])]
+        X_test[row_counter][0:4] = get_percentiles(tmp, ISIN)
+
+        # Volume Features
+        tmp = volume_matrix[ volume_matrix.index.isin(unique_date[unique_date < date])]
+        X_test[row_counter][4:8] = get_percentiles(tmp, ISIN)
+        
+        # Number of Trades Features
+        tmp = trades_matrix[ trades_matrix.index.isin(unique_date[unique_date < date])]
+        X_test[row_counter][8:12] = get_percentiles(tmp, ISIN)
+        
+        # Return Max Features  (proxy for vol)
+        tmp = retmax_matrix[ retmax_matrix.index.isin(unique_date[unique_date < date])]
+        X_test[row_counter][12:16] = get_percentiles(tmp, ISIN)
+
+        # Order Imbalance Features
+        tmp = orderimbalance_matrix[ orderimbalance_matrix.index.isin(unique_date[unique_date < date])]
+        X_test[row_counter][16:20] = get_percentiles(tmp, ISIN)
+
+        # actual returns today
+        ret = ret_matrix[ret_matrix.index.isin(unique_date[unique_date == date])][ISIN][0]
+        if ret > 0.01:
+            Y_test[row_counter] = 1  # positive
+        elif ret < -0.01:
+            Y_test[row_counter] = 2  # negative
+        else:
+            Y_test[row_counter] = 0  # neutral
+
+        print(ISIN +" "+ str(date)+ " test features populated")
+        row_counter += 1
 
 
 
+# Put data into dataloder
+train_data = []
+for i in range(len(X)):
+    train_data.append([X[i], Y[i]])
+
+test_data = []
+for i in range(len(X_test)):
+    test_data.append([X_test[i], Y_test[i]])
+
+
+
+
+# params
+params = {'batch_size': 8, 'shuffle': True}
+train_loader = DataLoader(train_data, **params)
+test_loader = DataLoader(test_data, **params)
+
+
+def predicted_y_fn(outputs):
+    predicted_y = torch.zeros(batch_size, dtype = torch.long)
+    for i in range(outputs.shape[0]):
+        _, predicted_y[i] = torch.max(outputs[i], 0)
+    return predicted_y
+
+
+
+def train(model,train_loader,test_loader,loss_func,opt,num_epochs=10):
+    
+    counter = 0
+    for epoch in range(num_epochs):
+
+        running_loss = 0.0
+        for i, data in enumerate(train_loader):
+            inputs, labels = data
+            opt.zero_grad()
+
+            outputs = model(inputs.to(dtype=torch.int64))
+            loss = loss_func(outputs, labels)
+            loss.backward()
+            opt.step()
+
+            # log training loss and training accuracy on each batch
+            predicted_y = predicted_y_fn(outputs)
+            train_accuracy = sum(predicted_y == labels).item() / batch_size   
+            counter += 1
+            writer.add_scalar('training_loss', loss.item(), counter)
+            writer.add_scalar('training_accuracy', train_accuracy, counter)
+
+            running_loss += loss.item()
+        print("Epoch {} - total training loss: {}".format(epoch, running_loss))
+
+        # after each epoch, evaluation mode
+        total_loss = 0.0
+        total_correct = 0.0
+        for i, data in enumerate(test_loader):
+            inputs, labels = data
+            outputs = model(inputs.to(dtype = torch.int64))
+            loss = loss_func(outputs, labels)
+            # test accuracy
+            predicted_y = predicted_y_fn(outputs)
+            num_correct = sum(predicted_y == labels).item() 
+
+            total_loss += loss.item()
+            total_correct += num_correct
+        
+        total_accuracy = total_correct / 10000
+        print("Epoch {} - total validation loss: {} - total validation accuracy: {}".
+              format(epoch, total_loss, total_accuracy))
+        
+
+
+
+# Train Basic Neural Network
+# ------------------------------------------------------------------
+class TwoLayerModel(nn.Module):
+  def __init__(self):
+    super(TwoLayerModel, self).__init__()
+    self.net = nn.Sequential(
+      nn.Linear(20, 10), 
+      nn.ReLU(), 
+      nn.Linear(10, 3))
+    
+  def forward(self, x):
+    return self.net(x)
+
+
+model = TwoLayerModel()
+loss = nn.CrossEntropyLoss()
+optimizer = optim.SGD(model.parameters(), lr= 0.001)
+
+
+train(model, train_loader, test_loader, loss, optimizer, 15)
