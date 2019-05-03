@@ -232,6 +232,17 @@ for date in test_dates:
 
 
 
+
+
+
+
+
+
+
+# ----------------------------------------------------------
+#  BASIC NEURAL NETWORK MODEL
+# ----------------------------------------------------------
+
 # Put data into dataloder
 train_data = []
 for i in range(len(X)):
@@ -242,14 +253,10 @@ for i in range(len(X_test)):
     test_data.append([X_test[i], Y_test[i]])
 
 
-
-
-# params
-params = {'batch_size': 8, 'shuffle': True}
+batch_size = 1
+params = {'batch_size': batch_size, 'shuffle': True}
 train_loader = DataLoader(train_data, **params)
 test_loader = DataLoader(test_data, **params)
-
-batch_size = 8
 
 
 def predicted_y_fn(outputs):
@@ -259,9 +266,8 @@ def predicted_y_fn(outputs):
     return predicted_y
 
 
-
+# code looks ugly - need to fix
 def train(model,train_loader,test_loader,loss_func,opt,num_epochs=10):
-    
     counter = 0
     for epoch in range(num_epochs):
 
@@ -271,38 +277,36 @@ def train(model,train_loader,test_loader,loss_func,opt,num_epochs=10):
             opt.zero_grad()
 
             outputs = model(inputs.to(dtype=torch.float))
-            loss = loss_func(outputs, labels.to(dtype = torch.int64))
+            loss = loss_func(outputs, labels.to(dtype = torch.float))
             loss.backward()
             opt.step()
 
             # log training loss and training accuracy on each batch
             predicted_y = predicted_y_fn(outputs)
-            train_accuracy = sum(predicted_y == labels.to(dtype = )).item() / batch_size   
+            train_accuracy = sum(predicted_y.to(dtype = torch.float) == labels.to(dtype = torch.float) ).item() / batch_size   
             counter += 1
 
-            #running_loss += loss.item()
-        print("Epoch {} - train accuracy : {}".format(epoch, train_accuracy))
+            running_loss += loss.item()
+        print("Epoch {}  running loss {} - train accuracy : {}".format(epoch, running_loss, train_accuracy))
 
         # after each epoch, evaluation mode
-        #total_loss = 0.0
+        total_loss = 0.0
         total_correct = 0.0
         for i, data in enumerate(test_loader):
             inputs, labels = data
             outputs = model(inputs.to(dtype = torch.float))
-            #loss = loss_func(outputs, labels.to(dtype = torch.int64))
+            loss = loss_func(outputs, labels.to(dtype = torch.float))
             # test accuracy
             predicted_y = predicted_y_fn(outputs)
-            num_correct = sum(predicted_y == labels).item() 
+            num_correct = sum(predicted_y.to(dtype = torch.float) == labels.to(dtype = torch.float)).item() 
 
-            #total_loss += loss.item()
+            total_loss += loss.item()
             total_correct += num_correct
         
         total_accuracy = total_correct / 10000
-        print("Epoch {}  - total validation accuracy: {}".
-              format(epoch,  total_accuracy))
+        print("Epoch {}  total loss {} - total validation accuracy: {}".
+              format(epoch, total_loss,  total_accuracy))
         
-
-
 
 # Train Basic Neural Network
 # ------------------------------------------------------------------
@@ -319,7 +323,7 @@ class TwoLayerModel(nn.Module):
 
 
 model = TwoLayerModel()
-loss = nn.CrossEntropyLoss()
+loss = nn.MSELoss()
 optimizer = optim.SGD(model.parameters(), lr= 0.001)
 
 train(model, train_loader, test_loader, loss, optimizer, 15)
