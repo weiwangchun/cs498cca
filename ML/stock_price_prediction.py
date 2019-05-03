@@ -107,9 +107,75 @@ for date in unique_date:
 
 
 
+# Get "processed" features and build training set
+min_lookback_length = 10 
+test_length = 2
+
+training_dates = unique_date[min_lookback_length: (len(unique_date) - test_length) ]
+test_dates = unique_date[ (len(unique_date) - test_length) : len(unique_date)  ]
 
 
 
 
+# get percentiles
+def get_percentiles(tmp_data, ISIN, lookback = 10):
+    # yesterday's value
+    yesterday_value = tmp_data[-1:][ISIN][0]
+    # total sum value over lookback period
+    total_value = tmp_data[-lookback:][ISIN].sum()
+    # relative to historical values 
+    hist_rank = tmp_data[ISIN].rank()
+    hist_pct = hist_rank[hist_rank.index.max()] / hist_rank.shape[0]
+    # relative to peers values
+    peer_rank = tmp_data[-1:].transpose().rank()
+    peer_pct = peer_rank.loc[ISIN][0] / peer_rank.shape[0]
 
+    return yesterday_value, total_value, hist_pct, peer_pct_ret
+
+
+# placeholder for features
+X = np.zeros((len(training_dates) * len(unique_ISINs)  , 4 * 5))
+Y = np.zeros((len(training_dates) * len(unique_ISINs)  , 1))
+
+row_counter = 0
+for date in training_dates:
+    for ISIN in unique_ISINs:
+
+        """
+        Return Features 
+        1) Yesterday's returns
+        2) Overall returns in lookback length
+        3) Yesterday's return as a percentile compared to the stock's historical return performance
+        4) Yesterday's return as a percentile compared to peer return performance
+        """
+        tmp = ret_matrix[ ret_matrix.index.isin(unique_date[unique_date < date])]
+        X[row_counter][0:4] = get_percentiles(tmp, ISIN)
+
+        """
+        Volume Features
+        """
+        tmp = volume_matrix[ volume_matrix.index.isin(unique_date[unique_date < date])]
+        X[row_counter][4:8] = get_percentiles(tmp, ISIN)
+        """
+        Number of Trades Features
+        """
+        tmp = trades_matrix[ trades_matrix.index.isin(unique_date[unique_date < date])]
+        X[row_counter][8:12] = get_percentiles(tmp, ISIN)
+        """
+        Return Max Features  (proxy for vol)
+        """
+        tmp = retmax_matrix[ retmax_matrix.index.isin(unique_date[unique_date < date])]
+        X[row_counter][12:16] = get_percentiles(tmp, ISIN)
+
+        """
+        Order Imbalance Features
+        """
+        tmp = orderimbalance_matrix[ orderimbalance_matrix.index.isin(unique_date[unique_date < date])]
+        X[row_counter][16:20] = get_percentiles(tmp, ISIN)
+
+        # actual returns today
+        
+
+        print(ISIN +" "+ str(date)+ " training features populated")
+        row_counter += 1
 
