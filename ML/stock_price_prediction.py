@@ -13,6 +13,10 @@ import requests
 import csv
 
 
+import torch
+from torch import nn
+from torch import optim
+import matplotlib.pyplot as plt
 
 
 
@@ -131,8 +135,8 @@ def get_percentiles(tmp_data, ISIN, lookback = 10):
     return yesterday_value, total_value, hist_pct, peer_pct
 
 
-# placeholder for features
-X = np.zeros((len(training_dates) * len(unique_ISINs)  , 4 * 5))
+# placeholder for X and y variables 
+X = np.zeros((len(training_dates) * len(unique_ISINs)  , 4 * 5)) 
 Y = np.zeros((len(training_dates) * len(unique_ISINs)  , 1))
 
 row_counter = 0
@@ -149,31 +153,36 @@ for date in training_dates:
         tmp = ret_matrix[ ret_matrix.index.isin(unique_date[unique_date < date])]
         X[row_counter][0:4] = get_percentiles(tmp, ISIN)
 
-        """
-        Volume Features
-        """
+        # Volume Features
         tmp = volume_matrix[ volume_matrix.index.isin(unique_date[unique_date < date])]
         X[row_counter][4:8] = get_percentiles(tmp, ISIN)
-        """
-        Number of Trades Features
-        """
+        
+        # Number of Trades Features
         tmp = trades_matrix[ trades_matrix.index.isin(unique_date[unique_date < date])]
         X[row_counter][8:12] = get_percentiles(tmp, ISIN)
-        """
-        Return Max Features  (proxy for vol)
-        """
+        
+        # Return Max Features  (proxy for vol)
         tmp = retmax_matrix[ retmax_matrix.index.isin(unique_date[unique_date < date])]
         X[row_counter][12:16] = get_percentiles(tmp, ISIN)
 
-        """
-        Order Imbalance Features
-        """
+        # Order Imbalance Features
         tmp = orderimbalance_matrix[ orderimbalance_matrix.index.isin(unique_date[unique_date < date])]
         X[row_counter][16:20] = get_percentiles(tmp, ISIN)
 
         # actual returns today
-
+        ret = ret_matrix[ret_matrix.index.isin(unique_date[unique_date == date])][ISIN][0]
+        if ret > 0.01:
+            Y[row_counter] = 1  # positive
+        elif ret < -0.01:
+            Y[row_counter] = 2  # negative
+        else:
+            Y[row_counter] = 0  # neutral
 
         print(ISIN +" "+ str(date)+ " training features populated")
         row_counter += 1
+
+
+# Train Neural Network
+
+
 
