@@ -115,8 +115,6 @@ training_dates = unique_date[min_lookback_length: (len(unique_date) - test_lengt
 test_dates = unique_date[ (len(unique_date) - test_length) : len(unique_date)  ]
 
 
-
-
 # get percentiles
 def get_percentiles(tmp_data, ISIN, lookback = 10):
     # yesterday's value
@@ -130,7 +128,7 @@ def get_percentiles(tmp_data, ISIN, lookback = 10):
     peer_rank = tmp_data[-1:].transpose().rank()
     peer_pct = peer_rank.loc[ISIN][0] / peer_rank.shape[0]
 
-    return yesterday_value, total_value, hist_pct, peer_pct_ret
+    return yesterday_value, total_value, hist_pct, peer_pct
 
 
 # placeholder for features
@@ -174,7 +172,7 @@ for date in training_dates:
         X[row_counter][16:20] = get_percentiles(tmp, ISIN)
 
         # actual returns today
-        
+
 
         print(ISIN +" "+ str(date)+ " training features populated")
         row_counter += 1
