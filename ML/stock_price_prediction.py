@@ -249,6 +249,8 @@ params = {'batch_size': 8, 'shuffle': True}
 train_loader = DataLoader(train_data, **params)
 test_loader = DataLoader(test_data, **params)
 
+batch_size = 8
+
 
 def predicted_y_fn(outputs):
     predicted_y = torch.zeros(batch_size, dtype = torch.long)
@@ -268,38 +270,36 @@ def train(model,train_loader,test_loader,loss_func,opt,num_epochs=10):
             inputs, labels = data
             opt.zero_grad()
 
-            outputs = model(inputs.to(dtype=torch.int64))
-            loss = loss_func(outputs, labels)
+            outputs = model(inputs.to(dtype=torch.float))
+            loss = loss_func(outputs, labels.to(dtype = torch.int64))
             loss.backward()
             opt.step()
 
             # log training loss and training accuracy on each batch
             predicted_y = predicted_y_fn(outputs)
-            train_accuracy = sum(predicted_y == labels).item() / batch_size   
+            train_accuracy = sum(predicted_y == labels.to(dtype = )).item() / batch_size   
             counter += 1
-            writer.add_scalar('training_loss', loss.item(), counter)
-            writer.add_scalar('training_accuracy', train_accuracy, counter)
 
-            running_loss += loss.item()
-        print("Epoch {} - total training loss: {}".format(epoch, running_loss))
+            #running_loss += loss.item()
+        print("Epoch {} - train accuracy : {}".format(epoch, train_accuracy))
 
         # after each epoch, evaluation mode
-        total_loss = 0.0
+        #total_loss = 0.0
         total_correct = 0.0
         for i, data in enumerate(test_loader):
             inputs, labels = data
-            outputs = model(inputs.to(dtype = torch.int64))
-            loss = loss_func(outputs, labels)
+            outputs = model(inputs.to(dtype = torch.float))
+            #loss = loss_func(outputs, labels.to(dtype = torch.int64))
             # test accuracy
             predicted_y = predicted_y_fn(outputs)
             num_correct = sum(predicted_y == labels).item() 
 
-            total_loss += loss.item()
+            #total_loss += loss.item()
             total_correct += num_correct
         
         total_accuracy = total_correct / 10000
-        print("Epoch {} - total validation loss: {} - total validation accuracy: {}".
-              format(epoch, total_loss, total_accuracy))
+        print("Epoch {}  - total validation accuracy: {}".
+              format(epoch,  total_accuracy))
         
 
 
@@ -321,6 +321,5 @@ class TwoLayerModel(nn.Module):
 model = TwoLayerModel()
 loss = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr= 0.001)
-
 
 train(model, train_loader, test_loader, loss, optimizer, 15)
