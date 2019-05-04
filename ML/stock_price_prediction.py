@@ -78,7 +78,7 @@ unique_ISINs = data['ISIN'].unique() # 2837 unique stocks
 
 # DELETE THIS
 # I'm taking the first 500 stocks for speed
-unique_ISINs = unique_ISINs[0:200]
+#unique_ISINs = unique_ISINs[0:200]
 # END DELETE
 
 
@@ -93,7 +93,9 @@ vwap_matrix = pd.DataFrame(index = unique_date, columns = unique_ISINs).fillna(0
 orderimbalance_matrix = pd.DataFrame(index = unique_date, columns = unique_ISINs).fillna(0.0000) 
 
 # a faster method
+counter = 0
 for ISIN in unique_ISINs:
+    print ("Stock Number " + str(counter) +" " + ISIN)
     stock_data = data[data["ISIN"] == ISIN]
     for date in unique_date:
         select_data = stock_data[stock_data["Date"] == date]
@@ -110,12 +112,13 @@ for ISIN in unique_ISINs:
 
         else:
             print(ISIN +" " + str(date) + " : No Data")
+    counter += 1
 
 
 
 # Get "processed" features and build training set
 min_lookback_length = 10 
-test_length = 2
+test_length = 20
 
 training_dates = unique_date[min_lookback_length: (len(unique_date) - test_length) ]
 test_dates = unique_date[ (len(unique_date) - test_length) : len(unique_date)  ]
@@ -187,6 +190,7 @@ for date in training_dates:
 X_test = np.zeros((len(test_dates) * len(unique_ISINs)  , 4 * 5)) 
 Y_test = np.zeros((len(test_dates) * len(unique_ISINs)  , 1))
 
+
 row_counter = 0
 for date in test_dates:
     for ISIN in unique_ISINs:
@@ -229,14 +233,43 @@ for date in test_dates:
 
 
 # ----------------------------------------------------------
-#  BASIC REGRESSION MODEL
+#  BASIC LOGISTIC REGRESSION MODEL
 # ----------------------------------------------------------
 from sklearn.linear_model import LogisticRegression
 regmodel = LogisticRegression()
 regmodel.fit(X, Y.ravel())
-Y_pred = regmodel.predict(X_test)
 
+# in sample prediction
+Y_pred = regmodel.predict(X)
+accuracy = (Y_pred.shape[0] - sum(abs(Y_pred - Y.ravel()))) / Y_pred.shape[0]
+
+# out of sample prediction
+Y_pred = regmodel.predict(X_test)
 accuracy = (Y_pred.shape[0] - sum(abs(Y_pred - Y_test.ravel()))) / Y_pred.shape[0]
+
+
+
+
+# ----------------------------------------------------------
+#  BACKTEST
+# ----------------------------------------------------------
+# long  1/len(unique_ISINs)  for every buy
+# short 1/len(unique_ISINs)  for every sell
+
+
+for date in test_dates:
+    for ISIN in unique_ISINs:
+        stock_features =[]
+        tmp = ret_matrix[ ret_matrix.index.isin(unique_date[unique_date == date])]
+        stock_features[0:4] = get_percentiles(tmp, ISIN)
+        tmp = volume_matrix[ volume_matrix.index.isin(unique_date[unique_date < date])]
+        stock_features[4:8] = get_percentiles(tmp, ISIN)
+        tmp = trades_matrix[ trades_matrix.index.isin(unique_date[unique_date < date])]
+        stock_features[8:12] = get_percentiles(tmp, ISIN)
+        tmp = retmax_matrix[ retmax_matrix.index.isin(unique_date[unique_date < date])]
+        stock_features[12:16] = get_percentiles(tmp, ISIN)
+        tmp = orderimbalance_matrix[ orderimbalance_matrix.index.isin(unique_date[unique_date < date])]
+        stock_features[16:20] = get_percentiles(tmp, ISIN)
 
 
 
