@@ -11,6 +11,7 @@ import numpy as np
 from datetime import date, timedelta
 import requests
 import csv
+import random 
 
 import torch
 from torch import nn
@@ -75,9 +76,8 @@ unique_date = data['Date'].unique() # 314 days
 unique_ISINs = data['ISIN'].unique() # 2837 unique stocks
 
 
-# DELETE THIS
-# I'm taking the first 500 stocks for speed
-#unique_ISINs = unique_ISINs[0:200]
+# DELETE IS if you want to run full sample
+unique_ISINs = random.sample(list(unique_ISINs), k = 100)
 # END DELETE
 
 
@@ -143,6 +143,7 @@ def get_percentiles(tmp_data, ISIN, lookback = 10):
 X = np.zeros((len(training_dates) * len(unique_ISINs)  , 4 * 5)) 
 Y = np.zeros((len(training_dates) * len(unique_ISINs)  , 1))
 
+
 row_counter = 0
 for date in training_dates:
     for ISIN in unique_ISINs:
@@ -175,10 +176,12 @@ for date in training_dates:
 
         # actual returns today
         ret = ret_matrix[ret_matrix.index.isin(unique_date[unique_date == date])][ISIN][0]
-        if ret > 0:
-            Y[row_counter] = 1  # positive
-        else:
+        if ret > 0.001:
+            Y[row_counter] = 2  # positive
+        elif ret < -0.001:
             Y[row_counter] = 0  # negative
+        else: 
+            Y[row_counter] = 1 # neutral
 
         print(ISIN +" "+ str(date)+ " training features populated")
         row_counter += 1
@@ -222,10 +225,13 @@ for date in test_dates:
 
         # actual returns today
         ret = ret_matrix[ret_matrix.index.isin(unique_date[unique_date == date])][ISIN][0]
-        if ret > 0:
-            Y_test[row_counter] = 1  # positive
-        else:
+
+        if ret > 0.001:
+            Y_test[row_counter] = 2  # positive
+        elif ret < -0.001:
             Y_test[row_counter] = 0  # negative
+        else: 
+            Y_test[row_counter] = 1 # neutral
 
         print(ISIN +" "+ str(date)+ " test features populated")
         row_counter += 1
@@ -267,7 +273,7 @@ confusion_out = pd.crosstab(Y_pred, Y_actual)
 # short 1/len(unique_ISINs)  for every sell
 
 
-PnL = pd.DataFrame(index = test_dates, columns = ["portfolio", "benchmark"]).fillna(0.0000) 
+PnL = pd.DataFrame(index = test_dates, columns = ["portfolio", "benchmark", "accuracy"]).fillna(0.0000) 
 
 for date in test_dates:
     profit = 0
@@ -292,16 +298,18 @@ for date in test_dates:
         # actual return
         ret = ret_matrix[ret_matrix.index.isin(unique_date[unique_date == date])][ISIN][0]
 
-        if pred[0] == 0:
+        if pred[0] == 0: # negative
             profit += -ret / len(unique_ISINs)
-        if pred[0] == 1:
-            profit += ret  / len(unique_ISINs)
-        
+        if pred[0] == 1: # neutral
+            profit += 0
+        if pred[0] == 2: # positive
+            profit += ret  / len(unique_ISINs)       
+
         benchmark += ret  / len(unique_ISINs)
-        print ("running profit " + str(profit) + " running benchmark " +  str(benchmark) + " current ret" + str(ret))
+        print (str(date) +"  - running profit " + str(profit) + " running benchmark " +  str(benchmark) + " current ret" + str(ret))
     # save profit into PnL
     PnL["portfolio"][date] = profit
-    PnL["benchmark"][data] = benchmark
+    PnL["benchmark"][date] = benchmark
 
     print ("portfolio "+ str(profit) + " benchmark "+ str(benchmark))
 
