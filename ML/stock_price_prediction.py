@@ -322,7 +322,7 @@ plt.title("Out of sample backtest")
 plt.xlabel('Time')
 plt.ylabel('Cumulative PnL')
 plt.legend(['Portfolio', 'Benchmark'], loc=4)
-plt.savefig('outofsample1.png', dpi = 1000)
+plt.savefig('outofsample2.png', dpi = 1000)
 
 
 
@@ -375,7 +375,7 @@ plt.title("In sample backtest")
 plt.xlabel('Time')
 plt.ylabel('Cumulative PnL')
 plt.legend(['Portfolio', 'Benchmark'], loc=4)
-plt.savefig('insample1.png', dpi = 1000)
+plt.savefig('insample2.png', dpi = 1000)
 
 
 
