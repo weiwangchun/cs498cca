@@ -56,40 +56,51 @@ Github project website: \href{https://github.com/weiwangchun/cs498cca}{https://g
 
 \section{Introduction}
 \textcolor{gray}{
-We intend to build a cloud hosted backtesting framework for algorithmic trading. The objective is to analyze a given data set of equities containing price-volume data and develop medium to high frequency cointegration strategies for trading equities (\emph{pairs trading}) quickly via cloud computing. A simple web interface will be constructed allowing users to control and tweak trading parameter settings, and see in-sample and out-of-sample trading performance (i.e., hypothetical profit and loss, tradings costs, turnover, portfolio risk and Sharpe ratio). }
+We intend to build a cloud hosted backtesting framework for algorithmic trading. The objective is to analyze a given data set of equities containing price-volume data and develop medium to high frequency strategies for trading equities quickly via cloud computing. A simple web interface will be constructed allowing users to control and tweak trading parameter settings, and see in-sample and out-of-sample trading performance (i.e., hypothetical profit and loss, tradings costs, turnover, portfolio risk and Sharpe ratio). }
 
+Given the limitations of our dataset, we focus on using a feature set that includes (i) stock returns, (ii) implied stock volatility, (iii) order imbalance, (iv) trading volumes and (v) number of trades to predict future stock prices. These information are all publically available, and hence if the German market was at least weakly efficient, trading profitably using this subset of information would be difficult. 
+For a given stock at a given time, we compute its most recent feature set, its long run average feature set and also its feature set percentile compared to its historical feature sets (i.e., how does it compare to history) and lastly compute its feature set percentile compared to its peers' feature sets (i.e., how does it compare to its peers). 
+We attempt to use both a simple logistic regression model and a neural network to predict future stock price.
+
+Our results are mildly successful, but after accounting for transaction costs, we conclude that we are unable to construct a commerically viable trading strategy.
 
 \section{Dataset}
-
+\textcolor{gray}{
 The chosen dataset is the Deutsche Borse public dataset available on Amazon Web Services (AWS). It contains trading data in 2 minute intervals for every tradeable security listed on the Eurex and Xetra trading platforms located in Frankfurt, Germany. The dataset is circa 3 GB in size with over 18,000 files and is located at: \href{https://s3.eu-central-1.amazonaws.com/deutsche-boerse-xetra-pds/}{https://s3.eu-central-1.amazonaws.com/deutsche-boerse-xetra-pds/}
+}
+In aggregate, we collected data from the 2nd of January 2018 to the 1st of April 2019 (314 unique trading days). In total, this had 18,854,026 rows. Each row represented a 2 minute trading interval for a particular stock. There were 2,837 unique stocks in the dataset.
+A snapshot of the dataset is shown below.
+\includegraphics[width=\columnwidth]{datasnap.png}
 
 
 
 \section{Technologies and Tools}
+\textcolor{gray}{
 To implement the objective of this project, we have chosen to leverage the vast computing and storage resources offered by AWS. The technologies used in this project are as follows:
-
 \begin{itemize}
 \item Simple Storage Service (S3) – for storing the dataset and outputs. 
 \item Elastic Cloud Compute (EC2) – for initial exploratory analysis and model development.                                                                
 \item Elastic MapReduce (EMR) -  for Deployment in Production.                                                                        
 \item Route53 – for front end web interface.      
 \end{itemize}
-
 A step-by-step methodical approach was implemented starting from creating an AWS account, creating users (team members), creating roles and permissions for team members and applications using Identity Access Management (IAM), downloading the data into the created S3 bucket using python helper functions and then use PySpark, built on AWS EMR clusters for exploratory analysis of the data. 
-
+}
+\textcolor{gray}{
 EMR cluster creation process involved creating a 3-node cluster. Selection of PySpark for model development led to inclusion of the relevant applictions, in this case, PySpark and JupyterHub. JupyterHub helps in line block execution of codes and display results subsequently helping us explore the data and keep track of every outcome. This process will help us test different predicivte models and alogrithms and fine tune the process in developing the final model before production deployment. 
-
+}
+\textcolor{gray}{
 After the model is finalized, We intend to develop a front end Web Interface using Amazon Route 53. A domain named \emph{“datainsight.guru”} is chosen where users can choose tickers and, control and tweak trading parameters to see the outcome of the predictive model. 
-
+}
 
 \section{Method Design}
-
+\textcolor{gray}{
 In terms of the overall methodology, we choose S3 to store the stock price data and choose to use PySpark built on AWS EMR clusters\footnote{We created a 3-nodes cluster following the AWS Cluster creation process. } to analyze the data.
 We use boto3 package in Python to upload stock price data from the Deustche public dataset to S3\footnote{See our codes in \href{https://github.com/weiwangchun/cs498cca}{Github}}.
 Lastly, we use EMR Notebook to run PySpark jobs. Announced in Nov 2018, EMR Notebook is essentially a Python Jupyter notebook pre-configured to connect to EMR and S3.
+}
 
+\textcolor{gray}{
 The general process of the project is as follows:
-
 \begin{enumerate}
 	\item Stock price-volume data is uploaded on S3
 	\item User (via web interface) selects the time horizon and trading parameters (i.e., trading costs, trading frequencies, lookback period, size of trading portfolio, ...)
@@ -102,52 +113,59 @@ The general process of the project is as follows:
 	 \end{itemize}
 	 \item Results will be displayed back to the user via the web interface
 \end{enumerate}
-
+}
 
 \subsection{Trading Model}
+
+\textcolor{gray}{
 Initially, we opted  to examine momentum strategies (Jegadeesh and Titman, 1993) on the German market. However, given the Deutsche database has a relatively short history (circa 2 years), we decided to instead focus on higher frequency trading strategies. 
 In particular, we will focus on implementing pairs trading (Vidyamurthy, 2004; Zhang and Zang, 2008) on relatively high frequency equities data.
-
+}
+\textcolor{gray}{
 Over user selected trading frequencies (highest frequency = 2 minutes, lowest 
 frequency = 1 day), we systematically search for cointegrated pairs of stocks on 
 the Xetra and Eurex stock exchanges using both the Engle-Granger and Johansen
 methods. Our trading strategy involves simultaneously buying and selling top cointegrated
 pairs whose spread has diverged, i.e., betting on convergence. 
+}
+
+Our trading model incorporated both time-series and cross-sectional data. 
+
+
 
 \section{Preliminary Evaluation Results}
+\textcolor{gray}{
 Since the main objective of CS 498 Cloud Computing Application is to understand cloud computing applications and their successful deployment, we emphasized the preliminary evaluation results on demostrating our ability to successfully create and deploy the cloud computing technologies listed in the “Method Design” section of this report. 
+}
 
+\textcolor{gray}{
  The various stages of deployment that we have completed so far: 
-
+}
+\textcolor{gray}{
 \begin{enumerate}
 	\item Using IAM to create users and apply roles and permissions for accessing the applications
 	\includegraphics[width=0.8\columnwidth]{pic1-0.png}
-	
 	\item Creating Roles for enabling application and user access to applictions
-	
 	\item Creating S3 bucket for data storage and access 
-	
 	\item IAM Role for S3 Bucket access by other applications used in this project
-	
 	\item Create EMR cluster (see Figure 1)
-	
 	\begin{figure*}[tp]
 	\includegraphics[width=\textwidth]{emr.png}
 	\caption{EMR Cluster}
 	\end{figure*}
-
 	\item Configuration for Python Jupyter Notebook to connect to EMR and S3
-	
 	\includegraphics[width=0.8\columnwidth]{jupyter.png}
-	
-	
 	\item Run PySpark job on Jupyter Notebook (see Figure 2)
 	\begin{figure*}[tp]
 	\includegraphics[width=\textwidth]{pyspark.png}
 	\caption{Running PySpark on Jupyter Notebooks}
 	\end{figure*}
-	
 \end{enumerate}
+}
+
+\subsection{Random Batch Backtests}
+
+We randomly sample 100 stocks from a repository of 
 
 
 \section{Discussion}

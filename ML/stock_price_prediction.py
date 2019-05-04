@@ -273,7 +273,7 @@ confusion_out = pd.crosstab(Y_pred, Y_actual)
 # short 1/len(unique_ISINs)  for every sell
 
 
-PnL = pd.DataFrame(index = test_dates, columns = ["portfolio", "benchmark", "accuracy"]).fillna(0.0000) 
+PnL = pd.DataFrame(index = test_dates, columns = ["portfolio", "benchmark" ]).fillna(0.0000) 
 
 for date in test_dates:
     profit = 0
@@ -293,6 +293,7 @@ for date in test_dates:
 
         # covert list to np array
         stock_features = np.asarray(stock_features).reshape(1, -1)
+        stock_features = np.nan_to_num(stock_features)
         pred = regmodel.predict(stock_features)
 
         # actual return
@@ -312,6 +313,71 @@ for date in test_dates:
     PnL["benchmark"][date] = benchmark
 
     print ("portfolio "+ str(profit) + " benchmark "+ str(benchmark))
+
+
+# plot backtest
+plt.figure(figsize=( 10.195, 3.841), dpi=100)
+plt.plot(PnL.cumsum())
+plt.title("Out of sample backtest")
+plt.xlabel('Time')
+plt.ylabel('Cumulative PnL')
+plt.legend(['Portfolio', 'Benchmark'], loc=4)
+plt.savefig('outofsample1.png', dpi = 1000)
+
+
+
+PnL = pd.DataFrame(index = training_dates, columns = ["portfolio", "benchmark" ]).fillna(0.0000) 
+
+for date in training_dates:
+    profit = 0
+    benchmark = 0
+    for ISIN in unique_ISINs:
+        stock_features =[]
+        tmp = ret_matrix[ ret_matrix.index.isin(unique_date[unique_date == date])]
+        stock_features[0:4] = get_percentiles(tmp, ISIN)
+        tmp = volume_matrix[ volume_matrix.index.isin(unique_date[unique_date < date])]
+        stock_features[4:8] = get_percentiles(tmp, ISIN)
+        tmp = trades_matrix[ trades_matrix.index.isin(unique_date[unique_date < date])]
+        stock_features[8:12] = get_percentiles(tmp, ISIN)
+        tmp = retmax_matrix[ retmax_matrix.index.isin(unique_date[unique_date < date])]
+        stock_features[12:16] = get_percentiles(tmp, ISIN)
+        tmp = orderimbalance_matrix[ orderimbalance_matrix.index.isin(unique_date[unique_date < date])]
+        stock_features[16:20] = get_percentiles(tmp, ISIN)
+
+        # covert list to np array
+        stock_features = np.asarray(stock_features).reshape(1, -1)
+        stock_features = np.nan_to_num(stock_features)
+        pred = regmodel.predict(stock_features)
+
+        # actual return
+        ret = ret_matrix[ret_matrix.index.isin(unique_date[unique_date == date])][ISIN][0]
+
+        if pred[0] == 0: # negative
+            profit += -ret / len(unique_ISINs)
+        if pred[0] == 1: # neutral
+            profit += 0
+        if pred[0] == 2: # positive
+            profit += ret  / len(unique_ISINs)       
+
+        benchmark += ret  / len(unique_ISINs)
+        print (str(date) +"  - running profit " + str(profit) + " running benchmark " +  str(benchmark) + " current ret" + str(ret))
+    # save profit into PnL
+    PnL["portfolio"][date] = profit
+    PnL["benchmark"][date] = benchmark
+
+    print ("portfolio "+ str(profit) + " benchmark "+ str(benchmark))
+
+
+# plot backtest
+plt.figure(figsize=( 10.195, 3.841), dpi=100)
+plt.plot(PnL.cumsum())
+plt.title("In sample backtest")
+plt.xlabel('Time')
+plt.ylabel('Cumulative PnL')
+plt.legend(['Portfolio', 'Benchmark'], loc=4)
+plt.savefig('insample1.png', dpi = 1000)
+
+
 
 
 # ----------------------------------------------------------
