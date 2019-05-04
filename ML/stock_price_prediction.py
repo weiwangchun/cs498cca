@@ -18,10 +18,6 @@ from torch import optim
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 
-from sklearn.datasets import make_classification
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GridSearchCV
 
 
 # Load all the trades into one dataframe
@@ -47,7 +43,7 @@ def batch_load(start_date, end_date):
     return pd.concat(data)
 
 
-# Get basic features for a select stock
+# Get basic features for a select stock at select time
 def get_info(select_data):
     length = select_data.shape[0] 
     total_volume = select_data["TradedVolume"].sum()
@@ -58,9 +54,8 @@ def get_info(select_data):
     total_return = select_data.iloc[length-1]["EndPrice"] / select_data.iloc[1]["StartPrice"] - 1
     max_return = abs(max(select_data["MaxPrice"]) - min(select_data["MinPrice"])) / vwap
     # order imbalance estimate
-    select_data.loc[:,"Buy_Initiation"] = (select_data.loc[:,"EndPrice"] > select_data.loc[:,"StartPrice"])
-    select_data.loc[:, "Buy_Initiation"] = select_data.loc[:,"Buy_Initiation"]*1
-    buy_trades = np.sum(select_data["NumberOfTrades"] * select_data["Buy_Initiation"])
+    buy_initiation = (select_data.loc[:,"EndPrice"] > select_data.loc[:,"StartPrice"]) * 1
+    buy_trades = np.sum(select_data["NumberOfTrades"] * buy_initiation) 
     sell_trades = total_trades - buy_trades
     order_imbalance = abs(buy_trades - sell_trades) / total_trades
 
@@ -68,19 +63,22 @@ def get_info(select_data):
 
 
 
-
 start_date = date(2018, 1, 2)
-end_date = date(2018, 3, 1)  # change to this -> end_date = date(2019, 4, 2)
+end_date = date(2019, 4, 1)  # change to this -> end_date = date(2019, 4, 2)
 delta = end_date - start_date
 
-data = batch_load(start_date, end_date)
-unique_date = data['Date'].unique()
-unique_ISINs = data['ISIN'].unique()
+data = batch_load(start_date, end_date)   # 18,854,026 rows * 14 columns
+
+# convert date to datetime
+data["Date"] = pd.to_datetime(data["Date"])
+
+unique_date = data['Date'].unique() # 314 days
+unique_ISINs = data['ISIN'].unique() # 2837 unique stocks
 
 
 # DELETE THIS
-# I'm taking the first 50 stocks for speed
-unique_ISINs = unique_ISINs[0:50]
+# I'm taking the first 500 stocks for speed
+unique_ISINs = unique_ISINs[0:200]
 # END DELETE
 
 
@@ -94,19 +92,20 @@ retmax_matrix = pd.DataFrame(index = unique_date, columns = unique_ISINs).fillna
 vwap_matrix = pd.DataFrame(index = unique_date, columns = unique_ISINs).fillna(0.0000) 
 orderimbalance_matrix = pd.DataFrame(index = unique_date, columns = unique_ISINs).fillna(0.0000) 
 
-for date in unique_date:
-    for ISIN in unique_ISINs:
-        select_data = data[(data["ISIN"] == ISIN) & (data["Date"] == str(date)) ]
-
+# a faster method
+for ISIN in unique_ISINs:
+    stock_data = data[data["ISIN"] == ISIN]
+    for date in unique_date:
+        select_data = stock_data[stock_data["Date"] == date]
         if select_data.shape[0] > 2:
             [volume, trades, vwap, ret, max_ret, orderimbalance] = get_info(select_data)
 
-            ret_matrix[ISIN][str(date)] = ret
-            volume_matrix[ISIN][str(date)] = volume
-            trades_matrix[ISIN][str(date)] = trades
-            retmax_matrix[ISIN][str(date)] = max_ret
-            vwap_matrix[ISIN][str(date)] = vwap
-            orderimbalance_matrix[ISIN][str(date)] = orderimbalance
+            ret_matrix[ISIN][date] = ret
+            volume_matrix[ISIN][date] = volume
+            trades_matrix[ISIN][date] = trades
+            retmax_matrix[ISIN][date] = max_ret
+            vwap_matrix[ISIN][date] = vwap
+            orderimbalance_matrix[ISIN][date] = orderimbalance
             print(ISIN +" " + str(date) + " : Inserted")
 
         else:
@@ -232,7 +231,12 @@ for date in test_dates:
 # ----------------------------------------------------------
 #  BASIC REGRESSION MODEL
 # ----------------------------------------------------------
+from sklearn.linear_model import LogisticRegression
+regmodel = LogisticRegression()
+regmodel.fit(X, Y.ravel())
+Y_pred = regmodel.predict(X_test)
 
+accuracy = (Y_pred.shape[0] - sum(abs(Y_pred - Y_test.ravel()))) / Y_pred.shape[0]
 
 
 
@@ -270,7 +274,6 @@ def predicted_y_fn(outputs):
 # code looks ugly - need to fix
 def train(model,train_loader,test_loader,loss_func,opt,num_epochs=10):
     counter = 0
-
 
     for epoch in range(num_epochs):
         running_loss = 0.0
