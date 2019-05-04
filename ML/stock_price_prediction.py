@@ -62,7 +62,6 @@ def get_info(select_data):
     return total_volume, total_trades, vwap, total_return, max_return, order_imbalance
 
 
-
 start_date = date(2018, 1, 2)
 end_date = date(2019, 4, 1)  # change to this -> end_date = date(2019, 4, 2)
 delta = end_date - start_date
@@ -236,17 +235,28 @@ for date in test_dates:
 #  BASIC LOGISTIC REGRESSION MODEL
 # ----------------------------------------------------------
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix
+
+
+X = np.nan_to_num(X)
 regmodel = LogisticRegression()
 regmodel.fit(X, Y.ravel())
 
 # in sample prediction
 Y_pred = regmodel.predict(X)
-accuracy = (Y_pred.shape[0] - sum(abs(Y_pred - Y.ravel()))) / Y_pred.shape[0]
+accuracy_in = (Y_pred.shape[0] - sum(abs(Y_pred - Y.ravel()))) / Y_pred.shape[0]
+
+Y_pred = pd.Series(Y_pred, name = "Predicted")
+Y_actual = pd.Series(Y.ravel(), name = "Actual")
+confusion_in = pd.crosstab(Y_pred, Y_actual)
 
 # out of sample prediction
 Y_pred = regmodel.predict(X_test)
-accuracy = (Y_pred.shape[0] - sum(abs(Y_pred - Y_test.ravel()))) / Y_pred.shape[0]
+accuracy_out = (Y_pred.shape[0] - sum(abs(Y_pred - Y_test.ravel()))) / Y_pred.shape[0]
 
+Y_pred = pd.Series(Y_pred, name = "Predicted")
+Y_actual = pd.Series(Y_test.ravel(), name = "Actual")
+confusion_out = pd.crosstab(Y_pred, Y_actual)
 
 
 
@@ -257,7 +267,11 @@ accuracy = (Y_pred.shape[0] - sum(abs(Y_pred - Y_test.ravel()))) / Y_pred.shape[
 # short 1/len(unique_ISINs)  for every sell
 
 
+PnL = pd.DataFrame(index = test_dates, columns = ["portfolio", "benchmark"]).fillna(0.0000) 
+
 for date in test_dates:
+    profit = 0
+    benchmark = 0
     for ISIN in unique_ISINs:
         stock_features =[]
         tmp = ret_matrix[ ret_matrix.index.isin(unique_date[unique_date == date])]
@@ -271,10 +285,25 @@ for date in test_dates:
         tmp = orderimbalance_matrix[ orderimbalance_matrix.index.isin(unique_date[unique_date < date])]
         stock_features[16:20] = get_percentiles(tmp, ISIN)
 
+        # covert list to np array
+        stock_features = np.asarray(stock_features).reshape(1, -1)
+        pred = regmodel.predict(stock_features)
 
+        # actual return
+        ret = ret_matrix[ret_matrix.index.isin(unique_date[unique_date == date])][ISIN][0]
 
+        if pred[0] == 0:
+            profit += -ret / len(unique_ISINs)
+        if pred[0] == 1:
+            profit += ret  / len(unique_ISINs)
+        
+        benchmark += ret  / len(unique_ISINs)
+        print ("running profit " + str(profit) + " running benchmark " +  str(benchmark) + " current ret" + str(ret))
+    # save profit into PnL
+    PnL["portfolio"][date] = profit
+    PnL["benchmark"][data] = benchmark
 
-
+    print ("portfolio "+ str(profit) + " benchmark "+ str(benchmark))
 
 
 # ----------------------------------------------------------
@@ -291,7 +320,7 @@ for i in range(len(X_test)):
     test_data.append([X_test[i], Y_test[i]])
 
 
-batch_size = 1
+batch_size = 16
 params = {'batch_size': batch_size, 'shuffle': True}
 train_loader = DataLoader(train_data, **params)
 test_loader = DataLoader(test_data, **params)
@@ -313,16 +342,15 @@ def train(model,train_loader,test_loader,loss_func,opt,num_epochs=10):
         total_accuracy = 0 
         for i, data in enumerate(train_loader):
             inputs, labels = data
-            opt.zero_grad()
-
+ 
             outputs = model(inputs.to(dtype=torch.float))
-            loss = loss_func(outputs, labels.to(dtype = torch.float))
+            loss = loss_func(outputs, labels.to(dtype = torch.int64).reshape(-1))
             loss.backward()
             opt.step()
 
             # log training loss and training accuracy on each batch
             predicted_y = predicted_y_fn(outputs)
-            train_accuracy = sum(predicted_y.to(dtype = torch.float) == labels.to(dtype = torch.float) ).item() / batch_size   
+            train_accuracy = sum(predicted_y == labels.to(dtype = torch.int64).reshape(-1) ).item() / batch_size   
             counter += 1
 
             running_loss += loss.item()
@@ -332,12 +360,10 @@ def train(model,train_loader,test_loader,loss_func,opt,num_epochs=10):
 
 # Train Basic Neural Network
 # ------------------------------------------------------------------
-
 class Flatten(nn.Module):
   """NN Module that flattens the incoming tensor."""
   def forward(self, input):
     return input.view(input.size(0), -1)
-
 
 class TwoLayerModel(nn.Module):
   def __init__(self):
@@ -351,9 +377,8 @@ class TwoLayerModel(nn.Module):
   def forward(self, x):
     return self.net(x)
 
-
 model = TwoLayerModel()
-loss = nn.MSELoss()
+loss = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr= 0.05)
 
 train(model, train_loader, test_loader, loss, optimizer, 200)
